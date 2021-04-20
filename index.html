@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>SVG Graph</title>
+    <title>Network Diffusion Demo</title>
     <script src="https://unpkg.com/vue" >
     </script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.0.0/dist/tf.min.js" >
@@ -18,6 +18,28 @@
         display:block;
         margin-left:auto;
         margin-right:auto;
+      }
+      .vueBadge {
+        float:left;
+        height:75px;
+        margin-top:5px;
+        margin-right:50px;
+        opacity:0.75
+      }
+      .tfBadge {
+        float:left;
+        height:90px;
+        margin-right:50px;
+        opacity:0.75
+      }
+      .byline {
+        display:inline-block;
+        width:100%;
+        color:grey;
+        padding-top:10px;
+        font-size:14px;
+        text-align:center;
+        text-decoration:underline
       }
       body {
         background:#111;
@@ -63,7 +85,7 @@
         v-bind:opacity="opacity" stroke="white" stroke-width="2px"> </line>
     </script>
     <script type="text/x-template" id="graphview-template" >
-      <div class="center" style="width:800px;margin-top:3%">
+      <div class="center" style="width:800px;margin-top:2%">
       <svg @click="clickOn" class="center" width=550px height=425px >
         <g> <gedges v-for="node in nodes" :key="'edges' + node.id"
           v-bind:node="node" > </gedges> </g>
@@ -103,12 +125,14 @@
     <div id="demo" >
       <graphview v-bind:nodes="nodes" v-bind:interact="interact" id="main_graphview"> </graphview>
       <br/>
-      <div class="center" style="width:600px;padding-left:100px;padding-top:20px">
-        <a href="https://vuejs.org/"><img src="./vue-js.png" style="float:left;height:75px;margin-top:5px;margin-right:50px;opacity:0.75"></img></a>
-        <a href="https://www.tensorflow.org/js"><img src="./tf-js.png" style="float:left;height:90px;margin-right:50px;opacity:0.75"></img></a>
+      <div class="center" style="width:600px;padding-left:100px;padding-top:10px">
+        <a href="https://vuejs.org/"><img src="./vue-js.png" class="vueBadge"></img></a>
+        <a href="https://www.tensorflow.org/js"><img src="./tf-js.png" class="tfBadge"></img></a>
         <controlpanel v-bind:vars="vars" style="float:left"> </controlpanel>
-      </div>
-    </div>
+    </div> </div>
+    <br/> <br/>
+    <a href="https://github.com/mindoftea/network_diffusion_demo">
+    <span class="byline">Emory Hufbauer, 2021</span></a>
     <script>
 
       'use strict'
@@ -122,7 +146,7 @@
       
       // How to get the data from the network file
       const coord_transform = ([ x , y ]) => {
-        return [ 750 * x + 280 , 750 * y + 200 ] }
+        return [ 750 * x + 280 , 750 * y + 180 ] }
       const initNodes = network => {
         const nodes = []
         let n = -1 ; while (++n < network.G.length) {
