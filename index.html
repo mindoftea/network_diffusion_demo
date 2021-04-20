@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SVG Graph</title>
+    <script src="https://unpkg.com/vue" >
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.0.0/dist/tf.min.js" >
+    </script>
+    <style>
+
+      .nodeField {
+        cursor:pointer
+      }
+      .nodeCore {
+        pointer-events:none
+      }
+      .center {
+        display:block;
+        margin-left:auto;
+        margin-right:auto;
+      }
+      body {
+        background:#111;
+        color:white;
+        font-family: sans-serif;
+      }
+      input[type=range]::-webkit-slider-runnable-track {
+        width: 100%;
+        height: 8.4px;
+        cursor: pointer;
+        box-shadow: 1px 1px 1px #000000, 0px 0px 1px #0d0d0d;
+        background: #3f3f3f;
+        border-radius: 1.3px;
+        border: 0.2px solid #010101;
+      }
+      input[type=range]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        border: 1px solid #000000;
+        height: 16px;
+        width: 16px;
+        border-radius: 3px;
+        background-color: #600;
+        cursor: pointer;
+        margin-top: -5px;
+      }
+  
+    </style>
+    <script type="text/x-template" id="gnode-template" >
+      <g> <circle v-bind:cx="node.x" v-bind:cy="node.y"
+          v-bind:r="3+4*node.field*node.field" v-bind:fill="color"
+          opacity="0.43" class="nodeField" > </circle>
+        <circle v-bind:cx="node.x"
+        v-bind:cy="node.y" v-bind:r="2.5+1.5*node.select"
+        v-bind:fill="color" class="nodeCore" > </circle>  </g>
+    </script>
+    <script type="text/x-template" id="gedges-template" >
+      <g> <gedge v-for="edge in node.edges" :key="'edge' + edge.id"
+        v-bind:edge="edge" > </gedge> </g>
+    </script>
+    <script type="text/x-template" id="gedge-template" >
+      <line v-bind:x1="edge.start.x" v-bind:y1="edge.start.y"
+        v-bind:x2="edge.end.x" v-bind:y2="edge.end.y"
+        v-bind:opacity="opacity" stroke="white" stroke-width="2px"> </line>
+    </script>
+    <script type="text/x-template" id="graphview-template" >
+      <div class="center" style="width:800px;margin-top:3%">
+      <svg @click="clickOn" class="center" width=550px height=425px >
+        <g> <gedges v-for="node in nodes" :key="'edges' + node.id"
+          v-bind:node="node" > </gedges> </g>
+        <g> <gnode v-for="node in nodes" :key="'node' + node.id"
+          v-bind:node="node" > </gnode> </g>
+      </svg>
+      <svg width=525px height=20px class="center" style="background-color:#222">
+        <circle cx="12" cy="10" r="4" fill="rgb(200,200,200)"></circle>
+        <text x="24" y="15" fill="rgb(200,200,200)" font-family="sans-serif" font-size="16">Susceptible</text>
+        <circle cx="120" cy="10" r="4" fill="rgb(127,64,255)"></circle>
+        <text x="135" y="15" fill="rgb(127,64,255)" font-family="sans-serif" font-size="16">Infected</text>
+        <circle cx="220" cy="10" r="4" fill="rgb(255,0,255)"></circle>
+        <text x="235" y="15" fill="rgb(255,0,255)" font-family="sans-serif" font-size="16">Severe</text>
+        <circle cx="320" cy="10" r="4" fill="rgb(255,255,0)"></circle>
+        <text x="335" y="15" fill="rgb(255,255,0)" font-family="sans-serif" font-size="16">Immune</text>
+        <circle cx="425" cy="10" r="4" fill="rgb(0,255,0)"></circle>
+        <text x="435" y="15" fill="rgb(0,255,0)" font-family="sans-serif" font-size="16">Vaccinated</text>
+      </svg>
+    </div>
+    </script>
+    <script type="text/x-template" id="controlslider-template" >
+      <input type="range" v-model="v.value" @click="v.del=true"
+          :min="v.min" :max="v.max" :step="0.01" />
+    </script>
+    <script type="text/x-template" id="controlpanel-template" >
+        <div style="float:right;width:240px">
+      <div v-for="(v, name) in vars" >
+        <controlslider v-bind:v="v"></controlslider>
+        <label style="color:#AAA">{{name}}</label>
+      </div> </div>
+    </script>
+    <script type="text/javascript" src="./components.js" > </script>
+    <script type="text/javascript" src="./GraphDiffusionModel.js" > </script>
+    <script type="text/javascript" src="./network.js" > </script>
+  </head>
+  <body>
+    <div id="demo" >
+      <graphview v-bind:nodes="nodes" v-bind:interact="interact" id="main_graphview"> </graphview>
+      <br/>
+      <div class="center" style="width:600px;padding-left:100px;padding-top:20px">
+        <a href="https://vuejs.org/"><img src="./imgs/vue-js.png" style="float:left;height:75px;margin-top:5px;margin-right:50px;opacity:0.75"></img></a>
+        <a href="https://www.tensorflow.org/js"><img src="./imgs/tf-js.png" style="float:left;height:90px;margin-right:50px;opacity:0.75"></img></a>
+        <controlpanel v-bind:vars="vars" style="float:left"> </controlpanel>
+      </div>
+    </div>
+    <script>
+
+      'use strict'
+  
+      // Most data moves between TF and Vue through this node interface
+      class Node { constructor( id , x ) {
+        this.id = id ; this.x = x[0] ; this.y = x[1]
+        this.color = { r:0 , g:0 , b:0 }
+        this.select = this.field = 0
+        this.edges = {} } }
+      
+      // How to get the data from the network file
+      const coord_transform = ([ x , y ]) => {
+        return [ 750 * x + 280 , 750 * y + 200 ] }
+      const initNodes = network => {
+        const nodes = []
+        let n = -1 ; while (++n < network.G.length) {
+          const node = new Node( n , coord_transform( network.xs[n] ) )
+          let m = n ; while ( m-- ) { if ( network.G[n][m] ) {
+            Vue.set( node.edges , m , {
+              active:true , id:node.id+'-'+nodes[m].id ,
+              start:node , end:nodes[m] } ) } }
+          nodes.push( node ) }
+        return nodes }
+
+      // How and when to update the Node model as the tensor data changes
+      const epsiNode = { x:.5 , y:.5 , select:0.25 , field:.0625 , r:0.02, g:0.02, b:0.02 }
+      const checkSet = ( a , k , b ) => {
+        if ( epsiNode[k] < Math.abs( a[k] - b ) ) { Vue.set( a , k , b ) } }
+      const applyDeltaNodes = nodes => ([ xs , color , select , field ]) => {
+        let n = -1 ; while (++n < nodes.length) {
+          checkSet( nodes[n] , 'x' , xs[n][0] )
+          checkSet( nodes[n] , 'y' , xs[n][1] )
+          checkSet( nodes[n] , 'select' , select[n] )
+          checkSet( nodes[n] , 'field' , field[n] )
+          checkSet( nodes[n].color , 'r' , color[n][0] )
+          checkSet( nodes[n].color , 'g' , color[n][1] )
+          checkSet( nodes[n].color , 'b' , color[n][2] ) } }
+      const applyDeltaEdges = nodes => G => 0
+      // const applyDeltaEdges = nodes => G => {
+      //   for ( let n of G.keys() ) {
+      //     let m = n ; while ( m-- ) { if ( G[n][m] != nodes[n].edges[m] ) {
+      //       Vue.set( nodes[n].edges[m] , 'active' , G[n][m] ) } } } }
+
+      // Set up shared data
+      const nodes = initNodes( network )
+      let interact = {click:false}
+      const vars = {
+        "Contagion": {
+          "value":.35 , "min": 0.1 , "max": 1.0 , "del": true } ,
+        // "distancing": {
+        //   "value":0.0 , "min": 0.0 , "max": 0.5 , "del": true } ,
+        "Vaccination": {
+          "value":.3 , "min": 0.1 , "max": 1.0 , "del": true } ,
+        "Immunity": {
+          "value":0.8 , "min": 0.1 , "max": 1.0 , "del": true } ,
+        "Rate": {
+          "value":4 , "min": 1 , "max": 30 , "del": true } , }
+
+      let mouseX = 0 ; let mouseY = 0
+      let drawZone = {top:0, left:0}
+      document.body.onmousemove = e => {
+        mouseX = e.clientX - drawZone.left ; mouseY = e.clientY - drawZone.top }
+
+      // Set up Vue instance
+      const mainVue = new Vue({ el: "#demo" ,
+        data: { nodes , interact , vars } })
+
+      let GraphModel
+      // Handy-dandy Y-combinator (keep an eye out for it below ;)
+      const Y = X => w => X( w , X )
+      // Load our TF model
+      tf.setBackend( "webgl" )
+       .then( () => new GraphDiffusionModelInstance(
+          network , vars, coord_transform ) )
+        // Give the Vue an initial update to synchronize
+       .then( (G) => GraphModel = G)
+       .then( ( GraphModel ) => (window.GraphModel = GraphModel) && Promise.all([
+          GraphModel.topo().then( applyDeltaEdges( nodes ) ) ,
+          GraphModel.state().then( applyDeltaNodes( nodes ) ) ])
+         .then( () => GraphModel ) )
+        // Our main loop
+       .then( Y( ( GraphModel , iterate ) => {
+          window.requestAnimationFrame( () => iterate(GraphModel , iterate) )
+          // If needed, update model vars
+          // if ( vars.distancing.del ) {
+          //   GraphModel.updateDensity( 1 - vars.distancing ) ; vars.distancing.del = false
+          //   // Update the Vue to hide the relevant edges
+            // GraphModel.topo().then( applyDeltaEdges( nodes ) ) }
+          if ( vars.Contagion.del || vars.Vaccination.del || vars.Immunity.del ) {
+            GraphModel.updateVars( +vars.Contagion.value , +vars.Vaccination.value , +vars.Immunity.value )
+            vars.Contagion.del = vars.Vaccination.del = vars.Immunity.del = false }
+          // Send the user's clicks through to the model
+          if (interact.click) tf.tidy(()=>GraphModel.infect( ) )
+          Vue.set(interact, 'click', false)
+          // Run the model itself for three steps
+          { let n = Math.round(vars.Rate.value) ; while ( n-- ) {
+            tf.tidy(()=>GraphModel.immunize() )
+            tf.tidy(()=>GraphModel.transit() )
+            tf.tidy(()=>GraphModel.transmit() ) } }
+          // Adjust the positioning by one step
+          // tf.tidy(()=>GraphModel.respatialize )
+          // Send the mouse hover data through to the model
+          tf.tidy(()=>GraphModel.selectPoint( [mouseX , mouseY] ))
+          // Update the Vue
+          GraphModel.state().then( applyDeltaNodes( nodes ) )
+          drawZone = main_graphview.children[0].getBoundingClientRect() } ) )
+
+    </script>
+  </body>
+</html>
