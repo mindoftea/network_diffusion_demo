@@ -76,7 +76,7 @@ class GraphDiffusionModelInstance {
   transit() {
     // compute differentials
     const sT = tf.matMul(this.statesvec, this.transition_matrix)
-    // apply logitic growth
+    // apply logistic growth
     const sv = tf.clipByValue( sT.mul(0.01).add(this.statesvec.mul(
       tf.exp( sT.mul(-1).add(Math.LN2) ).add(1).pow(-1).mul(3/2).add(1/2) )) , 0 , 100 )
     this.statesvec.dispose()
