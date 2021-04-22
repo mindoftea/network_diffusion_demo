@@ -145,6 +145,8 @@
         this.edges = {} } }
       
       // How to get the data from the network file
+      //  It contains a 429x429 adjecency matrix G, its 429x429 kernel matrix X
+      //   and a 429x2 spatialization matrix xs
       const coord_transform = ([ x , y ]) => {
         return [ 750 * x + 280 , 750 * y + 180 ] }
       const initNodes = network => {
